@@ -1,6 +1,5 @@
 <?php
-    require "php/include.php";
-    require "php/get_albums.php";
+    require_once "php/get_albums.php";
 ?>
 
 <!DOCTYPE html>
@@ -17,9 +16,9 @@
 </head>
 
 <body>
-    <nav class="navbar sticky-top navbar-expand-lg bg-body-tertiary">
+    <nav class="navbar bg-primary sticky-top navbar-expand-lg" data-bs-theme="dark">
         <div class="container-fluid">
-            <a class="navbar-brand" href="#">BDP4</a>
+            <div class="navbar-brand">BDP4</div>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarTogglerDemo02"
                 aria-controls="navbarTogglerDemo02" aria-expanded="false" aria-label="Toggle navigation">
                 <span class="navbar-toggler-icon"></span>
@@ -44,9 +43,8 @@
         </div>
     </nav>
 
-    <p>Howdy!</p>
-    <div class="container-fluid text-center">
-        <div class="row">
+    <div class="container-fluid text-center pt-3">
+        <div class="row row-cols-auto">
             <?php get_albums() ?>
         </div>
     </div>

@@ -1,13 +1,24 @@
 <?php
 
+require_once "php/include.php";
+
 function get_albums()
 {
     $dirs = glob_recursive(MUSIC_DIR, "*", GLOB_ONLYDIR | GLOB_NOSORT);
     sort($dirs, SORT_NATURAL | SORT_FLAG_CASE);
+
     foreach ($dirs as $dir) {
         if (str_contains($dir, "\$RECYCLE.BIN"))
             continue;
-        echo "<div class=\"col-sm\">$dir</div>";
+        if (!empty(array_filter(glob("$dir/*"), "is_dir")))
+            continue;
+        echo '
+            <figure class="figure">
+            	<a href="boo">
+            		<img src="', get_album_cover($dir), '" height="200" width="200" class="figure-img img-fluid">
+            	</a>
+            	<figcaption class="figure-caption">', basename(dirname($dir)), '<br>', basename($dir), '</figcaption>
+            </figure>';
     }
 }
 
@@ -38,20 +49,24 @@ function glob_recursive(string $baseDir, string $pattern, int $flags = GLOB_NOSO
 }
 
 /**
- * Sample data
- * 
-../Music/Bill Laswell/Bill Laswell and Pete Namlook/Outland 3
-../Music/Pierre Bensusan/Spices
-../Music/Harold Budd & Brian Eno/The Pearl
-../Music/Johnette Napolitano & Holly Vincent/Vowel Movement
-../Music/Eminem/The Marshall Mathers LP
-../Music/The Firm/Mean Business
-../Music/Mariah Carey/Music Box
-../Music/Alot of FLAC/Eagle-Eye Cherry
-../Music/Alot of FLAC/Beethoven/Beethoven 5th
-../Music/Alot of FLAC/Beethoven/Beethoven 7th
-../Music/Alot of FLAC/Beethoven/Beethoven 9th
-../Music/Alot of FLAC/Rolling Stones/Sticky Fingers
-../Music/Alot of FLAC/Rolling Stones/Let It Bleed
-
+ * Get album cover.
+ *
+ * @param string $dir Directory
+ * @return string
  */
+function get_album_cover($dir)
+{
+    $cover_file_name =  "img/dummy_200x200_ffffff_cccccc_.png";
+    $max_filesize = 0;
+
+    $cover_file_names = glob("$dir/*.{jpg,jpeg,png}", GLOB_BRACE);
+    foreach ($cover_file_names as $tmp) {
+        $filesize = filesize($tmp);
+        if ($filesize > $max_filesize) {
+            $max_filesize = $filesize;
+            $cover_file_name = $tmp;
+        }
+    }
+
+    return $cover_file_name;
+}
