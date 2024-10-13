@@ -13,17 +13,19 @@
 $options = [
     PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
     PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-    PDO::ATTR_EMULATE_PREPARES   => false,
+    PDO::ATTR_EMULATE_PREPARES   => false
 ];
 
-if (!$pdo = new PDO("sqlite:db.sqlite3", null, null, $options))
+if (!$pdo = new PDO("sqlite:/home/chris/bdp4/bdp4.sqlite", null, null, $options))
     exit($pdo->lastErrorMsg());
+
 
 //  Get all artists
 echo "Connected to DB\nAll artists:\n";
-$stmt = $pdo->query('SELECT name FROM artists');
+$stmt = $pdo->query('SELECT * FROM artists');
 while ($row = $stmt->fetch())
-    echo $row['name'], "\n";
+    echo var_export($row, true), "\n";
+
 
 //  Get one artist
 echo "\nGet one artist:\n";
@@ -33,31 +35,41 @@ $artist_name = $stmt->fetch();
 if ($artist_name)
     echo "Found ", $artist_name["name"], "\n";
 else
-    exit("Did not find artist");
+    echo "Did not find artist 5";
+
 
 //  Add artist
 echo "\nAdd artist:\n";
-$stmt = $pdo->prepare("INSERT INTO artists (name) values (:name)");
-$stmt->execute([':name' => "Artist 7"]);
-echo $stmt->rowCount(), " records inserted\n";
+$stmt = $pdo->prepare("INSERT INTO artists (name) values (:name) returning ArtistId");
+$rand = random_int(10, 1000);
+$stmt->execute(['name' => "Artist $rand"]);
+$ArtistIdInserted = $stmt->fetch()["ArtistId"];
 
 //  Add album
-echo "\nAdd artist:\n";
+echo "\nAdd album:\n";
 $img = "img/Fred Flintstone.jpg";
-$stmt = $pdo->prepare("INSERT INTO albums (name, cover_art, cover_art_hash) values (:name, :cover_art, :cover_art_hash)");
-$stmt->execute([':name' => "The Flintstones", "cover_art" => shrink_it($img), hash("xxh32", $img)]);
+if (!file_exists($img))
+    exit("No cover file");
+
+$stmt = $pdo->prepare("INSERT INTO albums (ArtistId, name, AlbumCoverFilePath, AlbumCoverFileHash, AlbumCoverArtImage) values (:ArtistId, :name, :AlbumCoverFilePath, :AlbumCoverFileHash, :AlbumCoverArtImage)");
+$stmt->execute(["ArtistId" => $ArtistIdInserted, "name" => "The Flintstone project", 'AlbumCoverFilePath' => $img, "AlbumCoverFileHash" => hash_file("xxh32", $img), "AlbumCoverArtImage" => resizeImage($img)]);
 echo $stmt->rowCount(), " records inserted\n";
 
-/*
+//  Get album
+
 //  Add songs
 
 //  Update
 
 //  Delete
-*/
 
-function shrink_it($fn)
+function resizeImage($image_path)
 {
-    //  https://stackoverflow.com/questions/14649645/resize-image-in-php
-
+    $image = imagecreatefromjpeg($image_path);
+    $imgResized = imagescale($image, 200, 200);
+    ob_start();
+    imagejpeg($imgResized);
+    $image_data = ob_get_contents();
+    ob_end_clean();
+    return base64_encode($image_data);
 }
