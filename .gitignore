@@ -6,3 +6,4 @@ db.sqlite3
 bpd4.sqlite
 bdp4.sqlite
 */*.gz
+*/*.out
