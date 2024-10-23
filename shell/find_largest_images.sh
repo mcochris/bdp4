@@ -5,27 +5,19 @@
 #║	image files and store a resized version of the largest image file in the
 #║	directory in the database.
 #╚═════════════════════════════════════════════════════════════════════════════
-. ./constants.sh || {
-	echo "Error: constants.sh not found" >&2
+. ./constants.sh
+[ $? -ne 0 ] && {
+	echo "Error: constants.sh failed" >&2
 	exit 1
 }
-
-#╔═════════════════════════════════════════════════════════════════════════════
-#║	Make sure all the required variables are set.
-#╚═════════════════════════════════════════════════════════════════════════════
-for var in MUSIC_DIR IMAGE_FILE_EXTENSIONS AUDIO_FILE_EXTENSIONS PID_FILE DB LOG LOG_FILE; do
-	[ -z "${!var}" ] && {
-		echo "Error: $var is not set" >&2
-		exit 2
-	}
-done
 
 trap $(
 	rm -f "$$PID_FILE"
 	exit 3
 ) 1 2 3 15
 
-$LOG && echo "=============================================
+$LOG && echo "
+=============================================
 Logging started $(date)
 =============================================" >>"$LOG_FILE"
 
@@ -109,21 +101,30 @@ $(echo $$ > "$PID_FILE") && log_this "PID file initialized" || {
 #║	Get the directory name of all images. If there are several images in the directory, the
 #║	directory will be listed several times. Use the uniq command to eliminate the duplicates.
 #╚═════════════════════════════════════════════════════════════════════════════
-image_dirs=$(find -E "$MUSIC_DIR" -iregex "$IMAGE_FILE_EXTENSIONS" -not -iregex '.*\$recycle\.bin.*' -exec dirname {} \; |
-	uniq)
+image_dirs=$(find -E "$MUSIC_DIR" -iregex "$IMAGE_FILE_EXTENSIONS" -not -iregex '.*\$recycle\.bin.*' -exec dirname {} \; | uniq)
 
-$LOG && log_this "Found $(echo $image_dirs | wc -l) directories with image files: $image_dirs"
+$LOG && log_this "Found $(echo "$image_dirs" | wc -l) directories with image files: $image_dirs"
 
+[ -z "$image_dirs" ] && {
+	$LOG && log_this "No directories with image files found"
+	exit 14
+}
+
+echo $image_dirs
+exit
 #╔═════════════════════════════════════════════════════════════════════════════
 #║	Start looping thru all the image directories. A $image_dir string example:
 #║		34700 test_dir/Fred Flintstone/album1/1direction.webp
 #╚═════════════════════════════════════════════════════════════════════════════
-for image_dir in image_dirs; do
+for image_dir in "$image_dirs; do
 	$LOG && log_this "Directory \"$image_dir\" has image files"
 
 	#	Don't include directories that have a image file but no music.
 	num_audio_files=$(find -E "$image_dir" -iregex "$AUDIO_FILE_EXTENSIONS" | wc -l)
 	
+	echo num_audio_files: $num_audio_files
+	exit
+
 	[ $num_audio_files -eq 0 ] && {
 		$LOG && "Skipping $image_dir because it has no music files"
 		continue
@@ -154,7 +155,7 @@ for image_dir in image_dirs; do
 	#║
 	#║	See if this image file is not in the database.
 	#╚═════════════════════════════════════════════════════════════════════════════
-	count=$(sqlite3 \"$DB\" SELECT COUNT(*) FROM directories WHERE directoryPath=\"$image_dir\";)
+	count=$("sqlite3 \"$DB\" SELECT COUNT(*) FROM directories WHERE directoryPath=\"$image_dir\";")
 	$LOG && log_this "sqlite3 \"$DB\" SELECT COUNT(*) FROM directories WHERE directoryPath=\"$image_dir\"; returns $count"
 	[ $count -eq 0 ] && {
 		$LOG && log_this "Image directory is not in the database, will insert it"
@@ -163,7 +164,7 @@ for image_dir in image_dirs; do
 		get_image_file_b64 "$largest_image_file"
 
 		#	Insert the image file into the SQL insert file.
-		return=$(sqlite3 \"$DB\" INSERT INTO directories (directoryPath, imageFilename, imageHash, imageB64) VALUES (\"$image_dir\", \"$largest_image_file\", \"$image_file_hash\", \"$b64\");)
+		return=$("sqlite3 \"$DB\" INSERT INTO directories (directoryPath, imageFilename, imageHash, imageB64) VALUES (\"$image_dir\", \"$largest_image_file\", \"$image_file_hash\", \"$b64\");")
 
 		$LOG && log_this "sqlite3 \"$DB\" INSERT INTO directories (directoryPath, imageFilename, imageHash, imageB64) VALUES (\"$image_dir\", \"$largest_image_file\", \"$image_file_hash\", \"$b64\"); returns $return"
 		continue
@@ -172,13 +173,13 @@ for image_dir in image_dirs; do
 	#╔═════════════════════════════════════════════════════════════════════════════
 	#║	image directory path is in the DB. Check if the hash is the same.
 	#╚═════════════════════════════════════════════════════════════════════════════
-	db_hash=$(sqlite3 \"$DB\" SELECT imageHash FROM directories WHERE directoryPath=\"$image_dir\";)
+	db_hash=$("sqlite3 \"$DB\" SELECT imageHash FROM directories WHERE directoryPath=\"$image_dir\";")
 	get_image_file_hash "$largest_image_file"
 	[ "$db_hash" = "$image_file_hash" ]	&& continue || {
 		$LOG && log_this "Hash in DB not not match hash of largest image file. Update the DB."
 		get_image_file_b64 "$largest_image_file"
 		#	Update the image file in the SQL insert file.
-		return=$(sqlite \"$DB\" UPDATE directories SET imageHash=\"$hash\", imageB64=\"$b64\" WHERE directoryPath=\"$image_dir\";)
+		return=$("sqlite \"$DB\" UPDATE directories SET imageHash=\"$hash\", imageB64=\"$b64\" WHERE directoryPath=\"$image_dir\";")
 		$LOG && log_this "sqlite \"$DB\" UPDATE directories SET imageHash=\"$hash\", imageB64=\"$b64\" WHERE directoryPath=\"$image_dir\"; returns $return"
 		continue
 	}
