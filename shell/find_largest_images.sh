@@ -5,8 +5,7 @@
 #║	image files and store a resized version of the largest image file in the
 #║	directory in the database.
 #╚═════════════════════════════════════════════════════════════════════════════
-. ./constants.sh
-[ $? -ne 0 ] && {
+. ./constants.sh || {
 	echo "Error: constants.sh failed" >&2
 	exit 1
 }
@@ -80,7 +79,7 @@ get_image_file_b64() {
 $LOG && log_this "Passed sanity checks"
 
 #╔═════════════════════════════════════════════════════════════════════════════
-#║	See if the SQL insert file is allready there. If it is, quit because this script
+#║	See if the PID file is allready there. If it is, quit because this script
 #║	is currently running.
 #╚═════════════════════════════════════════════════════════════════════════════
 [ -f "$PID_FILE" ] && {
@@ -92,7 +91,7 @@ $LOG && log_this "Passed sanity checks"
 #╔═════════════════════════════════════════════════════════════════════════════
 #║	Initialize program process identification file
 #╚═════════════════════════════════════════════════════════════════════════════
-$(echo $$ > "$PID_FILE") && log_this "PID file initialized" || {
+echo $$ > "$PID_FILE" && log_this "PID file initialized" || {
 	echo "Error: could not initialize PID file" >&2
 	exit 13
 }
@@ -101,43 +100,28 @@ $(echo $$ > "$PID_FILE") && log_this "PID file initialized" || {
 #║	Get the directory name of all images. If there are several images in the directory, the
 #║	directory will be listed several times. Use the uniq command to eliminate the duplicates.
 #╚═════════════════════════════════════════════════════════════════════════════
-image_dirs=$(find -E "$MUSIC_DIR" -iregex "$IMAGE_FILE_EXTENSIONS" -not -iregex '.*\$recycle\.bin.*' -exec dirname {} \; | uniq)
-
-$LOG && log_this "Found $(echo "$image_dirs" | wc -l) directories with image files: $image_dirs"
-
-[ -z "$image_dirs" ] && {
-	$LOG && log_this "No directories with image files found"
-	exit 14
-}
-
-echo $image_dirs
-exit
-#╔═════════════════════════════════════════════════════════════════════════════
-#║	Start looping thru all the image directories. A $image_dir string example:
-#║		34700 test_dir/Fred Flintstone/album1/1direction.webp
-#╚═════════════════════════════════════════════════════════════════════════════
-for image_dir in "$image_dirs; do
+find -E "$MUSIC_DIR" -iregex "$IMAGE_FILE_EXTENSIONS" -not -iregex ".*\$recycle\.bin.*" -exec dirname {} \; | uniq |
+while read -r image_dir;
+do
 	$LOG && log_this "Directory \"$image_dir\" has image files"
 
 	#	Don't include directories that have a image file but no music.
 	num_audio_files=$(find -E "$image_dir" -iregex "$AUDIO_FILE_EXTENSIONS" | wc -l)
 	
-	echo num_audio_files: $num_audio_files
-	exit
-
-	[ $num_audio_files -eq 0 ] && {
-		$LOG && "Skipping $image_dir because it has no music files"
+	[ "$num_audio_files" -eq 0 ] && {
+		$LOG && "Skipping \"$image_dir\" because it has no music files"
 		continue
 	}
 
-	$LOG && log_this "Found $num_audio_files audio files in $image_dir"
+	$LOG && log_this "Found $num_audio_files audio files in \"$image_dir\""
 
 	#	Get largest image file in the directory.
-	largest_image_file=$(find -E \"$image_dir\" -iregex "$IMAGE_FILE_EXTENSIONS" -exec stat -f %z {} \; |
-		sort --reverse --numeric-sort |
-		head --lines 1)
+	largest_image_file=$(find -E "$image_dir" -iregex "$IMAGE_FILE_EXTENSIONS" -exec stat -f "%z %N" {} \; |
+		sort --reverse --numeric-sort --field-separator " " --key 1 |
+		head --lines 1 |
+		cut -d " " -f 2-)
 
-	$LOG && log_this "Largest image file in $image_dir is $largest_image_file"
+	$LOG && log_this "Largest image file in \"$image_dir\" is \"$largest_image_file\""
 
 	[ -z "$largest_image_file" ] && {
 		echo "Error: largest_image_file is empty" >&2
@@ -157,7 +141,7 @@ for image_dir in "$image_dirs; do
 	#╚═════════════════════════════════════════════════════════════════════════════
 	count=$("sqlite3 \"$DB\" SELECT COUNT(*) FROM directories WHERE directoryPath=\"$image_dir\";")
 	$LOG && log_this "sqlite3 \"$DB\" SELECT COUNT(*) FROM directories WHERE directoryPath=\"$image_dir\"; returns $count"
-	[ $count -eq 0 ] && {
+	[ "$count" -eq 0 ] && {
 		$LOG && log_this "Image directory is not in the database, will insert it"
 
 		get_image_file_hash "$largest_image_file"
@@ -166,12 +150,14 @@ for image_dir in "$image_dirs; do
 		#	Insert the image file into the SQL insert file.
 		return=$("sqlite3 \"$DB\" INSERT INTO directories (directoryPath, imageFilename, imageHash, imageB64) VALUES (\"$image_dir\", \"$largest_image_file\", \"$image_file_hash\", \"$b64\");")
 
-		$LOG && log_this "sqlite3 \"$DB\" INSERT INTO directories (directoryPath, imageFilename, imageHash, imageB64) VALUES (\"$image_dir\", \"$largest_image_file\", \"$image_file_hash\", \"$b64\"); returns $return"
+		$LOG && log_this "sqlite3 \"$DB\" INSERT INTO directories (directoryPath, imageFilename, imageHash, imageB64) VALUES (\"$image_dir\", \"$largest_image_file\", \"$image_file_hash\", \"$b64\"); returns \"$return\""
 		continue
 	}
 
 	#╔═════════════════════════════════════════════════════════════════════════════
-	#║	image directory path is in the DB. Check if the hash is the same.
+	#║	image directory path is in the DB. Check if the hash is the same. If it's
+	#║	not, it means the image file has changed. Recompress the image file and
+	#║	update the DB.
 	#╚═════════════════════════════════════════════════════════════════════════════
 	db_hash=$("sqlite3 \"$DB\" SELECT imageHash FROM directories WHERE directoryPath=\"$image_dir\";")
 	get_image_file_hash "$largest_image_file"
@@ -179,26 +165,13 @@ for image_dir in "$image_dirs; do
 		$LOG && log_this "Hash in DB not not match hash of largest image file. Update the DB."
 		get_image_file_b64 "$largest_image_file"
 		#	Update the image file in the SQL insert file.
-		return=$("sqlite \"$DB\" UPDATE directories SET imageHash=\"$hash\", imageB64=\"$b64\" WHERE directoryPath=\"$image_dir\";")
-		$LOG && log_this "sqlite \"$DB\" UPDATE directories SET imageHash=\"$hash\", imageB64=\"$b64\" WHERE directoryPath=\"$image_dir\"; returns $return"
+		return=$("sqlite3 \"$DB\" UPDATE directories SET imageHash=\"$image_file_hash\", imageB64=\"$b64\" WHERE directoryPath=\"$image_dir\";")
+		$LOG && log_this "sqlite3 \"$DB\" UPDATE directories SET imageHash=\"$image_file_hash\", imageB64=\"$b64\" WHERE directoryPath=\"$image_dir\"; returns \"$return\""
 		continue
 	}
-
-	# #	See if this image file is already in the database. If it is, don't insert it again.
-	# [ $(sqlite3 \"$DB\" SELECT COUNT(*) FROM directories WHERE imageFilename=\"$largest_image_file\";) -gt 0 ] && continue
-	# #	Get the hash of the largest image file. This will be used later to check if the image
-	# #	file has changed and we need to update the database.
-	# image_file_hash=$(xxhsum "$largest_image_file" | cut -d ' ' -f 1)
-	# #	Check if the image file is allready in the database. If it is, don't insert it again.
-	# [ $(sqlite3 \"$DB\" SELECT COUNT(*) FROM directories WHERE =\"$imageB64\";) -gt 0 ] && continue
-	# #	Use ImageMagicK to resize the image file to 200x200 pixels and output
-	# #	the image file to a base64 string.
-	# image_b64_string=$(convert "$largest_image_file" -resize 200x200 -.jpg | base64 -w 0)
-	# #	Insert the image file into the SQL insert file.
-	# echo "INSERT INTO directories (AlbumCoverFilePath, AlbumCoverFileHash, AlbumCoverArtImage) VALUES (\"$largest_image_file\", \"$image_file_hash\", \"$image_cover_b64_string\");"
 done
 
-$(rm $PID_FILE) && log_this "PID file removed" || {
+rm "$PID_FILE" && log_this "PID file removed" || {
 	echo "Error: could not remove PID file" >&2
 	exit 14
 }
