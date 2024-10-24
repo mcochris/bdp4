@@ -18,7 +18,7 @@ trap $(
 $LOG && echo "
 =============================================
 Logging started $(date)
-=============================================" >>"$LOG_FILE"
+=============================================" >> "$LOG_FILE"
 
 #╔═════════════════════════════════════════════════════════════════════════════
 #║	User-defined functions
@@ -62,23 +62,6 @@ get_image_file_b64() {
 }
 
 #╔═════════════════════════════════════════════════════════════════════════════
-#║	Sanity checks.
-#╚═════════════════════════════════════════════════════════════════════════════
-[ -f "$DB" ] || {
-	echo Database file "$DB" does not exist >&2
-	$LOG && log_this "DB file does not exist"
-	exit 10
-}
-
-[ -s "$DB" ] || {
-	echo Database file "$DB" is empty >&2
-	$LOG && log_this "DB file is empty"
-	exit 11
-}
-
-$LOG && log_this "Passed sanity checks"
-
-#╔═════════════════════════════════════════════════════════════════════════════
 #║	See if the PID file is allready there. If it is, quit because this script
 #║	is currently running.
 #╚═════════════════════════════════════════════════════════════════════════════
@@ -91,10 +74,14 @@ $LOG && log_this "Passed sanity checks"
 #╔═════════════════════════════════════════════════════════════════════════════
 #║	Initialize program process identification file
 #╚═════════════════════════════════════════════════════════════════════════════
-echo $$ > "$PID_FILE" && log_this "PID file initialized" || {
+if echo $$ > "$PID_FILE"
+then
+	$LOG && log_this "PID file initialized"
+else
+	$LOG && log_this "Could not initialize PID file"
 	echo "Error: could not initialize PID file" >&2
 	exit 13
-}
+fi
 
 #╔═════════════════════════════════════════════════════════════════════════════
 #║	Get the directory name of all images. If there are several images in the directory, the
@@ -161,17 +148,22 @@ do
 	#╚═════════════════════════════════════════════════════════════════════════════
 	db_hash=$("sqlite3 \"$DB\" SELECT imageHash FROM directories WHERE directoryPath=\"$image_dir\";")
 	get_image_file_hash "$largest_image_file"
-	[ "$db_hash" = "$image_file_hash" ]	&& continue || {
+	if [ "$db_hash" = "$image_file_hash" ]
+	then
+		continue
+	else
 		$LOG && log_this "Hash in DB not not match hash of largest image file. Update the DB."
 		get_image_file_b64 "$largest_image_file"
 		#	Update the image file in the SQL insert file.
 		return=$("sqlite3 \"$DB\" UPDATE directories SET imageHash=\"$image_file_hash\", imageB64=\"$b64\" WHERE directoryPath=\"$image_dir\";")
 		$LOG && log_this "sqlite3 \"$DB\" UPDATE directories SET imageHash=\"$image_file_hash\", imageB64=\"$b64\" WHERE directoryPath=\"$image_dir\"; returns \"$return\""
-		continue
-	}
+	fi
 done
 
-rm "$PID_FILE" && log_this "PID file removed" || {
+if rm "$PID_FILE"
+then
+	log_this "PID file removed"
+else
 	echo "Error: could not remove PID file" >&2
 	exit 14
-}
+fi
