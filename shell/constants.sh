@@ -1,3 +1,5 @@
+#!/usr/bin/env sh
+
 readonly MUSIC_DIR="../../Music/Alot of FLAC/Beethoven/"
 readonly IMAGE_FILE_EXTENSIONS='.*\.(jpg|jpeg|webp|bmp|gif|png|ico|jpt|pgx|tiff)$'
 readonly AUDIO_FILE_EXTENSIONS='.*\.(mp3|flac|wav|ogg|pcm|aiff|aac|wma|alac|wma)$'
@@ -38,7 +40,7 @@ readonly LOG_FILE="find_largest_images.log"
 
 [ -f "$PID_FILE" ] && {
 	[ $(find "$PID_FILE" -mmin +60) ] && {
-		echo This program \($(basename $0)\) has been running for over an hour, something is wrong. Will restart program. >&2
+		echo This program \($(basename "$0")\) has been running for over an hour, something is wrong. Will restart program. >&2
 		rm -f "$PID_FILE"
 	} || {
 		echo This program is already running >&2
@@ -47,10 +49,10 @@ readonly LOG_FILE="find_largest_images.log"
 }
 
 [ -f $LOG_FILE ] && {
-	[ $(find "$LOG_FILE" -size 10k) ] && {
+	[ $(stat -f %z "$LOG_FILE") -gt 10000 ] && {
 		echo Trimming large log file \($LOG_FILE\). >&2
-		tail --lines=250 $LOG_FILE > /tmp/$LOG_FILE
-		mv /tmp/$LOG_FILE $LOG_FILE
+		tail --lines=100 "$LOG_FILE" > "/tmp/$LOG_FILE"
+		mv "/tmp/$LOG_FILE" "$LOG_FILE"
 	}
 }
 
