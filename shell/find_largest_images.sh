@@ -10,6 +10,9 @@
 	exit 1
 }
 
+#╔═════════════════════════════════════════════════════════════════════════════
+#║	Get rid of PID file if the program is terminiated.
+#╚═════════════════════════════════════════════════════════════════════════════
 trap $(
 	rm -f "$$PID_FILE"
 	exit 3
@@ -21,48 +24,68 @@ Logging started $(date)
 =============================================" >> "$LOG_FILE"
 
 #╔═════════════════════════════════════════════════════════════════════════════
-#║	User-defined functions
+#║	Append a message to the log file. Pass a string as an argument.
+#║	Example: log_this "This is a log message"
+#║	Returns nothing, sets no variables.
 #╚═════════════════════════════════════════════════════════════════════════════
 log_this() {
 	[ -z "$1" ] && {
 		echo "Error: log_this() needs a string argument" >&2
 		exit 4
 	}
+	
 	[ -z "$LOG_FILE" ] && {
 		echo "Error: log_this() needs a LOG_FILE variable" >&2
 		exit 5
 	}
-	echo "$(date)| $1" >>"$LOG_FILE"
+	
+	echo "$(date)| $1" >> "$LOG_FILE"
 }
 
+#╔═════════════════════════════════════════════════════════════════════════════
+#║	Get the hash of a file. Pass the image filedirectory path as an argument.
+#║	Example: get_image_file_hash "/path/to/image.jpg"
+#║	Returns nothing, sets the variable $image_file_hash.
+#╚═════════════════════════════════════════════════════════════════════════════
 get_image_file_hash() {
 	[ -z "$1" ] && {
 		echo "Error: get_image_file_hash() needs a string argument" >&2
 		exit 6
 	}
+
 	image_file_hash=$(xxhsum "$1" | cut -d ' ' -f 1)
+	
 	[ -z "$image_file_hash" ] && {
 		echo "Error: get_image_file_hash() failed" >&2
 		exit 7
 	}
+	
 	$LOG && log_this "get_image_file_hash(): sets \$image_file_hash to $image_file_hash"
 }
 
+#╔═════════════════════════════════════════════════════════════════════════════
+#║	Turn an image file into a base64 string. Pass the image file path as an argument.
+#║	Example: get_image_file_b64 "/path/to/image.jpg"
+#║	Returns nothing, sets the variable $b64.
+#╚═════════════════════════════════════════════════════════════════════════════
 get_image_file_b64() {
 	[ -z "$1" ] && {
 		echo "Error: get_image_file_b64() needs a string argument" >&2
 		exit 8
 	}
-	b64=$(convert "$1" -resize 200x200 -.jpg | base64 -w 0)
+
+	b64=$(convert "$1" -resize 200x200 jpg:- | base64 -w 0)
+
 	[ -z "$b64" ] && {
 		echo "Error: get_image_file_b64() failed" >&2
 		exit 9
 	}
+
 	$LOG && log_this "get_image_file_b64(): sets \$b64 to a ${#b64} byte base64 string"
 }
 
 #╔═════════════════════════════════════════════════════════════════════════════
-#║	See if the PID file is allready there. If it is, quit because this script
+#║	See if the PID file is already there. If it is, quit because this script
 #║	is currently running.
 #╚═════════════════════════════════════════════════════════════════════════════
 [ -f "$PID_FILE" ] && {
@@ -84,11 +107,12 @@ else
 fi
 
 #╔═════════════════════════════════════════════════════════════════════════════
-#║	Get the directory name of all images. If there are several images in the directory, the
-#║	directory will be listed several times. Use the uniq command to eliminate the duplicates.
+#║	Get the directory name of all images. If there are several images in the
+#║	directory, the directory will be listed several times. Use the uniq command
+#║	to eliminate the duplicate path names.
 #╚═════════════════════════════════════════════════════════════════════════════
 find -E "$MUSIC_DIR" -iregex "$IMAGE_FILE_EXTENSIONS" -not -iregex ".*\$recycle\.bin.*" -exec dirname {} \; | uniq |
-while read -r image_dir;
+while read -r image_dir
 do
 	$LOG && log_this "Directory \"$image_dir\" has image files"
 
@@ -126,18 +150,19 @@ do
 	#║
 	#║	See if this image file is not in the database.
 	#╚═════════════════════════════════════════════════════════════════════════════
-	count=$("sqlite3 \"$DB\" SELECT COUNT(*) FROM directories WHERE directoryPath=\"$image_dir\";")
-	$LOG && log_this "sqlite3 \"$DB\" SELECT COUNT(*) FROM directories WHERE directoryPath=\"$image_dir\"; returns $count"
+	# echo "SELECT COUNT(ALL) FROM directories WHERE directoryPath = '$image_dir';" | sqlite3 "$DB" > tmp
+	count=$(sqlite3 "$DB" "SELECT COUNT(ALL) FROM directories WHERE directoryPath='$image_dir';")
+	$LOG && log_this "SELECT COUNT(ALL) FROM directories WHERE directoryPath='$image_dir'; returns $count"
 	[ "$count" -eq 0 ] && {
-		$LOG && log_this "Image directory is not in the database, will insert it"
+		$LOG && log_this "Image is not in the database, will insert it"
 
 		get_image_file_hash "$largest_image_file"
 		get_image_file_b64 "$largest_image_file"
 
 		#	Insert the image file into the SQL insert file.
-		return=$("sqlite3 \"$DB\" INSERT INTO directories (directoryPath, imageFilename, imageHash, imageB64) VALUES (\"$image_dir\", \"$largest_image_file\", \"$image_file_hash\", \"$b64\");")
+		return=$(sqlite3 "$DB" "INSERT INTO directories (directoryPath, imageFilename, imageHash, imageB64) VALUES ('$image_dir', '$largest_image_file', '$image_file_hash', '$b64');")
 
-		$LOG && log_this "sqlite3 \"$DB\" INSERT INTO directories (directoryPath, imageFilename, imageHash, imageB64) VALUES (\"$image_dir\", \"$largest_image_file\", \"$image_file_hash\", \"$b64\"); returns \"$return\""
+		$LOG && log_this "sqlite3 \"$DB\" INSERT INTO directories (directoryPath, imageFilename, imageHash, imageB64) VALUES (\"$image_dir\", \"$largest_image_file\", \"$image_file_hash\", \"...\"); returns \"$return\""
 		continue
 	}
 
