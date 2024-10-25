@@ -1,5 +1,7 @@
 #!/usr/bin/env sh
 
+#	Todo: if a directory gets deleted, the image file record should be deleted from the database.
+
 #╔═════════════════════════════════════════════════════════════════════════════
 #║	Borurne shell script to get a list of all the directories that contain
 #║	image files and store a resized version of the largest image file in the
@@ -8,6 +10,65 @@
 . ./constants.sh || {
 	echo "Error: constants.sh failed" >&2
 	exit 1
+}
+
+#╔═════════════════════════════════════════════════════════════════════════════
+#║	Make sure all the constants I need are here.
+#╚═════════════════════════════════════════════════════════════════════════════
+[ -f "$DB" ] || {
+	echo Database file "$DB" does not exist >&2
+	exit 20
+}
+
+[ -s "$DB" ] || {
+	echo Database file "$DB" is empty >&2
+	exit 21
+}
+
+[ -d "$MUSIC_DIR" ] || {
+	echo Music directory "$MUSIC_DIR" does not exist >&2
+	exit 22
+}
+
+[ -z "$IMAGE_FILE_EXTENSIONS" ] && {
+	echo Image file extensions are not set >&2
+	exit 23
+}
+
+[ -z "$AUDIO_FILE_EXTENSIONS" ] && {
+	echo Audio file extensions are not set >&2
+	exit 24
+}
+
+[ -z "$PID_FILE" ] && {
+	echo PID file is not set >&2
+	exit 25
+}
+
+[ -z "$MAX_LOG_SIZE" ] && {
+	echo MAX_LOG_SIZE number is not set >&2
+	exit 25
+}
+
+[ -f "$PID_FILE" ] && {
+	[ $(find "$PID_FILE" -mmin +60) ] && {
+		echo This program \($(basename "$0")\) has been running for over an hour, something is wrong. Will restart program. >&2
+		rm -f "$PID_FILE"
+	} || {
+		echo This program is already running >&2
+		exit 26
+	}
+}
+
+#╔═════════════════════════════════════════════════════════════════════════════
+#║	Keep log file from getting too large.
+#╚═════════════════════════════════════════════════════════════════════════════
+[ -f $LOG_FILE ] && {
+	[ $(stat -f %z "$LOG_FILE") -gt "$MAX_LOG_SIZE" ] && {
+		echo Trimming large log file \($LOG_FILE\). >&2
+		tail --lines=100 "$LOG_FILE" > "/tmp/$LOG_FILE"
+		mv "/tmp/$LOG_FILE" "$LOG_FILE"
+	}
 }
 
 #╔═════════════════════════════════════════════════════════════════════════════
@@ -150,7 +211,6 @@ do
 	#║
 	#║	See if this image file is not in the database.
 	#╚═════════════════════════════════════════════════════════════════════════════
-	# echo "SELECT COUNT(ALL) FROM directories WHERE directoryPath = '$image_dir';" | sqlite3 "$DB" > tmp
 	count=$(sqlite3 "$DB" "SELECT COUNT(ALL) FROM directories WHERE directoryPath='$image_dir';")
 	$LOG && log_this "SELECT COUNT(ALL) FROM directories WHERE directoryPath='$image_dir'; returns $count"
 	[ "$count" -eq 0 ] && {
@@ -162,7 +222,7 @@ do
 		#	Insert the image file into the SQL insert file.
 		return=$(sqlite3 "$DB" "INSERT INTO directories (directoryPath, imageFilename, imageHash, imageB64) VALUES ('$image_dir', '$largest_image_file', '$image_file_hash', '$b64');")
 
-		$LOG && log_this "sqlite3 \"$DB\" INSERT INTO directories (directoryPath, imageFilename, imageHash, imageB64) VALUES (\"$image_dir\", \"$largest_image_file\", \"$image_file_hash\", \"...\"); returns \"$return\""
+		$LOG && log_this "sqlite3 \"$DB\" INSERT INTO directories (directoryPath, imageFilename, imageHash, imageB64) VALUES (\"$image_dir\", \"$largest_image_file\", \"$image_file_hash\", <long b64 string>); returns \"$return\""
 		continue
 	}
 
@@ -171,17 +231,20 @@ do
 	#║	not, it means the image file has changed. Recompress the image file and
 	#║	update the DB.
 	#╚═════════════════════════════════════════════════════════════════════════════
-	db_hash=$("sqlite3 \"$DB\" SELECT imageHash FROM directories WHERE directoryPath=\"$image_dir\";")
+	db_hash=$(sqlite3 \"$DB\" "SELECT imageHash FROM directories WHERE directoryPath='$image_dir';")
+
 	get_image_file_hash "$largest_image_file"
+	
 	if [ "$db_hash" = "$image_file_hash" ]
 	then
 		continue
 	else
 		$LOG && log_this "Hash in DB not not match hash of largest image file. Update the DB."
 		get_image_file_b64 "$largest_image_file"
+
 		#	Update the image file in the SQL insert file.
-		return=$("sqlite3 \"$DB\" UPDATE directories SET imageHash=\"$image_file_hash\", imageB64=\"$b64\" WHERE directoryPath=\"$image_dir\";")
-		$LOG && log_this "sqlite3 \"$DB\" UPDATE directories SET imageHash=\"$image_file_hash\", imageB64=\"$b64\" WHERE directoryPath=\"$image_dir\"; returns \"$return\""
+		return=$(sqlite3 \"$DB\" "UPDATE directories SET imageHash='$image_file_hash', imageB64='$b64' WHERE directoryPath='$image_dir';")
+		$LOG && log_this "sqlite3 \"$DB\" UPDATE directories SET imageHash='$image_file_hash', imageB64='<long b64 string>' WHERE directoryPath='$image_dir'; returns \"$return\""
 	fi
 done
 
