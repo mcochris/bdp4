@@ -1,52 +1,78 @@
-<?php
-    require_once "php/get_albums.php"
-?>
 <!DOCTYPE html>
 <html lang="en">
 
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>BDP4</title>
-    <link rel="icon" type="image/png" href="favicon.png">
-    <link rel="stylesheet" href="css/bootstrap.min.css">
-    <link rel="stylesheet" href="fonts/bootstrap-icons.min.css">
-    <script defer src="js/bootstrap.bundle.min.js"></script>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>BDP4</title>
+	<link rel="icon" type="image/png" href="favicon.png">
+	<link rel="stylesheet" href="css/bootstrap.min.css">
+	<link rel="stylesheet" href="fonts/bootstrap-icons.min.css">
+	<script defer src="js/bootstrap.bundle.min.js"></script>
+	<style>
+		:root {
+			--picture-size: 200px;
+		}
+
+		.album {
+			overflow-y: auto;
+			max-width: var(--picture-size);
+			max-height: 2.5em;
+			margin-bottom: 0;
+			font-weight: bold;
+		}
+
+		.artist {
+			overflow-y: auto;
+			font-size: .8em;
+			max-width: var(--picture-size);
+			max-height: 2.5em;
+		}
+	</style>
 </head>
 
 <body>
-    <nav class="navbar bg-primary sticky-top navbar-expand-lg" data-bs-theme="dark">
-        <div class="container-fluid">
-            <div class="navbar-brand">BDP4</div>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarTogglerDemo02"
-                aria-controls="navbarTogglerDemo02" aria-expanded="false" aria-label="Toggle navigation">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-            <div class="collapse navbar-collapse" id="navbarTogglerDemo02">
-                <ul class="navbar-nav me-auto mb-2 mb-lg-0">
-                    <li class="nav-item">
-                        <a class="nav-link active" aria-current="page" href="#">Home</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="#">Link</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link disabled" aria-disabled="true">Disabled</a>
-                    </li>
-                </ul>
-                <form class="d-flex" role="search">
-                    <input class="form-control me-2" type="search" placeholder="Search" aria-label="Search">
-                    <button class="btn btn-outline-success" type="submit">Search</button>
-                </form>
-            </div>
-        </div>
-    </nav>
+	<nav class="navbar bg-primary sticky-top navbar-expand-lg" data-bs-theme="dark">
+		<div class="container-fluid">
+			<div class="navbar-brand">BDP4</div>
+			<button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarTogglerDemo02"
+				aria-controls="navbarTogglerDemo02" aria-expanded="false" aria-label="Toggle navigation">
+				<span class="navbar-toggler-icon"></span>
+			</button>
+			<div class="collapse navbar-collapse" id="navbarTogglerDemo02">
+				<ul class="navbar-nav me-auto mb-2 mb-lg-0">
+					<li class="nav-item">
+						<a class="nav-link active" aria-current="page" href="#">Home</a>
+					</li>
+					<li class="nav-item">
+						<a class="nav-link" href="#">Link</a>
+					</li>
+					<li class="nav-item">
+						<a class="nav-link disabled" aria-disabled="true">Disabled</a>
+					</li>
+				</ul>
+				<form class="d-flex" role="search">
+					<input class="form-control me-2" type="search" placeholder="Search" aria-label="Search">
+					<button class="btn btn-outline-success" type="submit">Search</button>
+				</form>
+			</div>
+		</div>
+	</nav>
 
-    <div class="container-fluid text-center pt-3">
-        <div class="row row-cols-auto">
-            <?php get_albums() ?>
-        </div>
-    </div>
+	<div class="container-fluid text-center pt-3">
+		<div class="row row-cols-auto">
+			<!-- <div>
+				<img src="img/missing_album_cover.png" class="img-fluid" alt="album1">
+				<p class="album">Album 1 Album 1 Album 1 Album 1 Album 1 Album 1 Album 1 Album 1</p>
+				<p class="artist">Artist 1</p>
+			</div>
+			<div>
+				<img src="img/missing_album_cover.png" class="img-fluid" alt="album1">
+				<p class="album">Album 1</p>
+				<p class="artist">Artist 1 Artist 1 Artist 1 Artist 1 Artist 1</p>
+			</div> -->
+		</div>
+	</div>
 
 </body>
 
