@@ -1,6 +1,8 @@
 #!/usr/bin/env sh
 
 #	Todo: if a directory gets deleted, the image file record should be deleted from the database.
+#	Bug: Directories without an image are bring skipped even if they have music files.
+#	Problem: This program can only be tested on unix, making ir harder to develop on windows.
 
 #╔═════════════════════════════════════════════════════════════════════════════
 #║	Borurne shell script to get a list of all the directories that contain
