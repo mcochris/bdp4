@@ -1,9 +1,11 @@
 {
-    "cSpell.words": [
-        "bitmask",
-        "nosort",
-        "alot",
-        "flac",
-        "onlydir"
-    ]
+	"cSpell.words": [
+		"alot",
+		"bitmask",
+		"ERRMODE",
+		"flac",
+		"nosort",
+		"onlydir",
+		"URLSAFE"
+	]
 }
