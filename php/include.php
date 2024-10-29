@@ -2,18 +2,19 @@
 
 declare(strict_types=1);
 
-// 
-//  Global variables and required functions used by bdp4 app.
-//
-
+#╔═════════════════════════════════════════════════════════════════════════════
+#║	This file contains the configuration settings for the program.
+#╚═════════════════════════════════════════════════════════════════════════════
 define("PRODUCTION", false);
-define("MUSIC_DIR", "music/Alot of FLAC/");
+define("MUSIC_DIR", "\\\\freenas.localdomain\\Music\\Alot of FLAC\\Beethoven");
 define("DB_FILE_NAME", "bdp4.sqlite");
 define("DEBUG_LOG", "debug.log");
+define("IMAGE_FILE_EXTENSIONS", ["jpg", "jpeg", "webp", "bmp", "gif", "png", "ico", "jpt", "pgx", "tiff"]);
+define("AUDIO_FILE_EXTENSIONS", ["mp3", "flac", "wav", "ogg", "pcm", "aiff", "aac", "wma", "alac", "wma"]);
 
 ini_set("error_reporting", E_ALL);
 ini_set("log_errors", true);
-ini_set("error_log", "bdp4error.log");
+ini_set("error_log", "error.log");
 
 if (PRODUCTION) {
 	ini_set("display_errors", false);
@@ -23,87 +24,114 @@ if (PRODUCTION) {
 	ini_set("display_startup_errors", true);
 }
 
-//  enable help and debug options
+define("DB_OPTIONS", [
+	PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
+	PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+	PDO::ATTR_EMULATE_PREPARES   => false
+]);
+
+define("ALBUM_ART_WIDTH", 200);
+define("ALBUM_ART_HEIGHT", 200);
+define("HASH_ALGORITHM", "xxh3");
+
+#╔═════════════════════════════════════════════════════════════════════════════
+#║	Get the command line options.
+#╚═════════════════════════════════════════════════════════════════════════════
 $options = getopt("h", ["debug::", "help"]);
 
-//  Does the user want help?
+#╔═════════════════════════════════════════════════════════════════════════════
+#║	Display program help if asked for on the command line.
+#╚═════════════════════════════════════════════════════════════════════════════
 if (in_array(key($options), ["h", "help"]))
 	exit(help());
 
-//  If debug arg is set, then determine debug levels.
-//  If no debug value, all debugging is on.
-//  If there is a debug value, it's a comma-separated list of function to debug.
-if (key($options) === "debug") {
+#╔═════════════════════════════════════════════════════════════════════════════
+#║	If the debug arg is set on the command line, determine debug levels.
+#║	If no debug value, all debugging is off.
+#║	If there is a debug value, it's a comma-separated list of functions to debug.
+#║	If the user specifies "all", all functions are debugged.
+#╚═════════════════════════════════════════════════════════════════════════════
+if (strtolower(key($options)) === "debug") {
 	define("DEBUG", true);
-	if (empty($options["debug"]))
-		define("DEBUG_FUNCTIONS", "all");
-	else
-		define("DEBUG_FUNCTIONS", explode(",", $options["debug"]));
-} else {
-	define("DEBUG", false);
-	define("DEBUG_FUNCTIONS", []);
+	if (empty($options["debug"])) {
+		define("DEBUG", false);
+		define("DEBUG_FUNCTIONS", []);
+	} else
+		define("DEBUG_FUNCTIONS", array_map("strtolower", explode(",", $options["debug"])));
 }
 
-/**
- * Recursive `glob()`.
- *
- * @author info@ensostudio.ru
- * @link https://gist.github.com/UziTech/3b65b2543cee57cd6d2ecfcccf846f20?permalink_comment_id=3393822#gistcomment-3393822
- * @param string $baseDir Base directory to search
- * @param string $pattern Glob pattern
- * @param int $flags Behavior bitmask
- * @return array|string|bool
- */
-function glob_recursive(string $baseDir = "", string $pattern = "", int $flags = GLOB_NOSORT | GLOB_BRACE): array
-{
-	if (empty($baseDir)) {
-		error_log("Music directory not supplied.");
-		exit(0);
-	}
-
-	if (!is_dir($baseDir)) {
-		error_log("Specified music directory \"$baseDir\" is not a directory.");
-		exit(0);
-	}
-
-	if (empty($pattern)) {
-		error_log("glob pattern not supplied.");
-		exit(0);
-	}
-
-	$paths = glob(rtrim($baseDir, '\/') . DIRECTORY_SEPARATOR . $pattern, $flags);
-	if ($paths === false) {
-		error_log(__FUNCTION__ . "- glob on directory \"$baseDir\" failed.");
-		exit(0);
-	}
-
-	foreach ($paths as $path)
-		if (is_dir($path)) {
-			$subPaths = (__FUNCTION__)($path, $pattern, $flags);
-			if ($subPaths !== false) {
-				$subPaths = (array) $subPaths;
-				array_push($paths, ...$subPaths);
-			}
-		}
-
-	debug(__FUNCTION__, "found these subdirectories in directory \"$baseDir\":\n" . var_export($paths, true));
-	return $paths;
-}
-
-/**
- *  Display help message
- */
+#╔═════════════════════════════════════════════════════════════════════════════
+#║	Display program help if asked for on the command line.
+#╚═════════════════════════════════════════════════════════════════════════════
 function help(): void
 {
 	echo "help!\n";
 }
 
-
-/**
- *  Write debug message to debug log
- */
-function debug(string $function, string $message): void
+#╔═════════════════════════════════════════════════════════════════════════════
+#║	If debugging is enabled for the specified function, write the message to
+#║	the debug log.
+#╚═════════════════════════════════════════════════════════════════════════════
+function debug(string $function = "", string $message = ""): void
 {
-	if ((DEBUG_FUNCTIONS === "all") or in_array($function, DEBUG_FUNCTIONS))
-		file_put_contents(DEBUG_LOG, "[" . date("M j o g:i:s a e") . "]: function \"$function\" returns:\n" . $message . "\n", FILE_APPEND);
+	if (DEBUG)
+		if (in_array(strtolower($function), DEBUG_FUNCTIONS, true) or in_array("all", DEBUG_FUNCTIONS, true))
+			file_put_contents(DEBUG_LOG, "[" . date("M j o g:i:s a e") . "]: function \"$function\" returns:\n" . $message . "\n", FILE_APPEND);
+}
+
+#╔═════════════════════════════════════════════════════════════════════════════
+#║	Get a list of all image files in the specified directory.
+#╚═════════════════════════════════════════════════════════════════════════════
+function getMusicFiles(string $directory = ""): array
+{
+	DEBUG and debug(__FUNCTION__, "passed directory: \"$directory\"");
+
+	$musicFiles = [];
+	$iterator = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($directory));
+
+	foreach ($iterator as $file)
+		if ($file->isFile() and in_array(strtolower($file->getExtension()), AUDIO_FILE_EXTENSIONS, true))
+			$musicFiles[] = ["pathname" => $file->getPath(), "filename" => $file->getFilename()];
+
+	DEBUG and debug(__FUNCTION__, "returning " . count($musicFiles) . " music files: " . var_export($musicFiles, true));
+
+	return $musicFiles;
+}
+
+#╔═════════════════════════════════════════════════════════════════════════════
+#║	Run a database operation.
+#║	@link https://www.php.net/manual/en/book.sqlite3.php
+#║	@link https://phpdelusions.net/pdo
+#║	@link https://www.tutorialspoint.com/sqlite/sqlite_php.htm
+#╚═════════════════════════════════════════════════════════════════════════════
+function database_operation(string $sql = "", array $parameters = []): array
+{
+	DEBUG and debug(__FUNCTION__, "passed sql: \"$sql\" and parameters: " . var_export($parameters, true));
+
+	try {
+		$pdo = new PDO("sqlite:" . DB_FILE_NAME, null, null, DB_OPTIONS);
+		$stmt = $pdo->prepare($sql);
+		$stmt->execute($parameters);
+		$result = $stmt->fetchAll();
+	} catch (PDOException $e) {
+		$result = ["error" => $e->getMessage()];
+	}
+
+	DEBUG and debug(__FUNCTION__, "returning " . count($result) . " results: " . var_export($result, true));
+
+	return $result;
+}
+
+#╔═════════════════════════════════════════════════════════════════════════════
+#║	Resize an image.
+#╚═════════════════════════════════════════════════════════════════════════════
+function resizeImage(string $image_path = ""): string
+{
+	$image = imagecreatefromjpeg($image_path);
+	$imgResized = imagescale($image, ALBUM_ART_WIDTH, ALBUM_ART_HEIGHT);
+	ob_start();
+	imagejpeg($imgResized);
+	$image_data = ob_get_contents();
+	ob_end_clean();
+	return sodium_bin2base64($image_data, SODIUM_BASE64_VARIANT_URLSAFE);
 }
