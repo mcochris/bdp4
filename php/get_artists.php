@@ -17,14 +17,24 @@ if (PHP_SAPI !== "cli") {
 
 require_once "php/include.php";
 
-function get_artists(array $music_dirs = []): void
+function get_artists(array $music_dirs = []): array
 {
 	DEBUG and debug(__FUNCTION__, "passed " . count($music_dirs) . " music directories: " . var_export($music_dirs, true));
 
+	$tmp =	preg_split("|\\\\|", MUSIC_DIR);
+	DEBUG and debug(__FUNCTION__, "preg_split on MUSIC_DIR: " . var_export($tmp, true));
+	$music_dir_suffix = $tmp[count($tmp) - 1];
+	DEBUG and debug(__FUNCTION__, "music_dir_suffix: \"$music_dir_suffix\"");
 	$artists = [];
+
 	foreach ($music_dirs as $music_dir) {
 		$tmp = preg_split("|\\\\|", $music_dir["pathname"]);
 		$artist = $tmp[count($tmp) - 2];
-		DEBUG and debug(__FUNCTION__, "found artist: \"$artist\"");
+		if ($artist === $music_dir_suffix)
+			$artist = $tmp[count($tmp) - 1];
+		DEBUG and debug(__FUNCTION__, "turned \"" . $music_dir["pathname"] . "\" into artist: \"$artist\"");
+		$artists[] = $artist;
 	}
+
+	return array_unique($artists);
 }
