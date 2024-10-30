@@ -6,7 +6,7 @@ declare(strict_types=1);
 #║	This file contains the configuration settings for the program.
 #╚═════════════════════════════════════════════════════════════════════════════
 define("PRODUCTION", false);
-define("MUSIC_DIR", "\\\\freenas.localdomain\\Music\\Alot of FLAC\\Beethoven");
+define("MUSIC_DIR", "\\\\freenas.localdomain\\Music\\Alot of FLAC");
 define("DB_FILE_NAME", "bdp4.sqlite");
 define("DEBUG_LOG", "debug.log");
 define("IMAGE_FILE_EXTENSIONS", ["jpg", "jpeg", "webp", "bmp", "gif", "png", "ico", "jpt", "pgx", "tiff"]);
@@ -36,13 +36,14 @@ define("HASH_ALGORITHM", "xxh3");
 
 #╔═════════════════════════════════════════════════════════════════════════════
 #║	Get the command line options.
+#║	usage: php program.php [-h|--help] [--debug[=all|function1,function2,...]]
 #╚═════════════════════════════════════════════════════════════════════════════
 $options = getopt("h", ["debug::", "help"]);
 
 #╔═════════════════════════════════════════════════════════════════════════════
 #║	Display program help if asked for on the command line.
 #╚═════════════════════════════════════════════════════════════════════════════
-if (in_array(key($options), ["h", "help"]))
+if (in_array(key($options), ["h", "help"], true))
 	exit(help());
 
 #╔═════════════════════════════════════════════════════════════════════════════
@@ -51,13 +52,14 @@ if (in_array(key($options), ["h", "help"]))
 #║	If there is a debug value, it's a comma-separated list of functions to debug.
 #║	If the user specifies "all", all functions are debugged.
 #╚═════════════════════════════════════════════════════════════════════════════
-if (strtolower(key($options)) === "debug") {
-	define("DEBUG", true);
-	if (empty($options["debug"])) {
-		define("DEBUG", false);
-		define("DEBUG_FUNCTIONS", []);
-	} else
+if (empty(key($options))) {
+	define("DEBUG", false);
+	define("DEBUG_FUNCTIONS", []);
+} else {
+	if (strtolower(key($options)) === "debug") {
+		define("DEBUG", true);
 		define("DEBUG_FUNCTIONS", array_map("strtolower", explode(",", $options["debug"])));
+	}
 }
 
 #╔═════════════════════════════════════════════════════════════════════════════
@@ -90,8 +92,12 @@ function getMusicFiles(string $directory = ""): array
 	$iterator = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($directory));
 
 	foreach ($iterator as $file)
-		if ($file->isFile() and in_array(strtolower($file->getExtension()), AUDIO_FILE_EXTENSIONS, true))
-			$musicFiles[] = ["pathname" => $file->getPath(), "filename" => $file->getFilename()];
+		if ($file->isFile() and in_array(strtolower($file->getExtension()), AUDIO_FILE_EXTENSIONS, true)) {
+			$pathname = $file->getPath();
+			$filename = $file->getFilename();
+			DEBUG and debug(__FUNCTION__, "found music file, pathname: \"$pathname\", filename: \"$filename\"");
+			$musicFiles[] = ["pathname" => $pathname, "filename" => $filename];
+		}
 
 	DEBUG and debug(__FUNCTION__, "returning " . count($musicFiles) . " music files: " . var_export($musicFiles, true));
 
