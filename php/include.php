@@ -78,7 +78,7 @@ function debug(string $function = "", string $message = ""): void
 {
 	if (DEBUG)
 		if (in_array(strtolower($function), DEBUG_FUNCTIONS, true) or in_array("all", DEBUG_FUNCTIONS, true))
-			file_put_contents(DEBUG_LOG, "[" . date("M j o g:i:s a e") . "]: function \"$function\" returns:\n" . $message . "\n", FILE_APPEND);
+			file_put_contents(DEBUG_LOG, "[" . date("M j o g:i:s a e") . "]: debug message from \"$function\": " . $message . "\n", FILE_APPEND);
 }
 
 #╔═════════════════════════════════════════════════════════════════════════════
