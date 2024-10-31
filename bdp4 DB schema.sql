@@ -64,6 +64,7 @@ CREATE TABLE playlist_songs (
 	FOREIGN KEY (song_id) REFERENCES songs(song_id)
 ) STRICT;
 
+-- The following view is used to create the main UI display
 CREATE VIEW song_details AS
 SELECT
 	s.title AS song_name,
