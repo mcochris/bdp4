@@ -82,7 +82,7 @@ function debug(string $function = "", string $message = ""): void
 }
 
 #╔═════════════════════════════════════════════════════════════════════════════
-#║	Get a list of all image files in the specified directory.
+#║	Get a list of all music files in the specified directory.
 #╚═════════════════════════════════════════════════════════════════════════════
 function getMusicFiles(string $directory = ""): array
 {
@@ -123,7 +123,7 @@ function database_operation(string $sql = "", array $parameters = []): array
 		$result = ["error" => $e->getMessage()];
 	}
 
-	DEBUG and debug(__FUNCTION__, "returning " . count($result) . " results: " . var_export($result, true));
+	DEBUG and debug(__FUNCTION__, "results: " . var_export($result, true));
 
 	return $result;
 }
